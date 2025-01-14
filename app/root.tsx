@@ -79,6 +79,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 import { logStore } from './lib/stores/logs';
+import { createE2BContainer, startE2BContainer, stopE2BContainer } from './lib/e2b-container';
 
 export default function App() {
   const theme = useStore(themeStore);
@@ -90,6 +91,17 @@ export default function App() {
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
     });
+
+    // Initialize E2B container during application startup
+    (async () => {
+      try {
+        const container = await createE2BContainer();
+        await startE2BContainer(container.id);
+        logStore.logSystem('E2B container initialized', { containerId: container.id });
+      } catch (error) {
+        logStore.logSystem('Failed to initialize E2B container', { error: error.message });
+      }
+    })();
   }, []);
 
   return (

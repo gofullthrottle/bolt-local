@@ -5,6 +5,7 @@ import git, { type GitAuth, type PromiseFsClient } from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
 import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
+import { createE2BContainer, startE2BContainer, stopE2BContainer } from '~/lib/e2b-container';
 
 const lookupSavedPassword = (url: string) => {
   const domain = url.split('/')[2];
@@ -62,6 +63,16 @@ export function useGit() {
         headers.Authorization = `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString('base64')}`;
       }
 
+      // E2B container integration
+      let containerId: string | null = null;
+      try {
+        const container = await createE2BContainer();
+        containerId = container.id;
+        await startE2BContainer(containerId);
+      } catch (error) {
+        console.error('Failed to create or start E2B container:', error);
+      }
+
       try {
         await git.clone({
           fs,
@@ -108,6 +119,15 @@ export function useGit() {
       } catch (error) {
         console.error('Git clone error:', error);
         throw error;
+      } finally {
+        // Stop the E2B container after cloning
+        if (containerId) {
+          try {
+            await stopE2BContainer(containerId);
+          } catch (error) {
+            console.error('Failed to stop E2B container:', error);
+          }
+        }
       }
     },
     [webcontainer, fs, ready],

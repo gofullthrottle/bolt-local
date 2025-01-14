@@ -18,6 +18,7 @@ import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
 import type { ActionAlert } from '~/types/actions';
+import { createE2BContainer, startE2BContainer, stopE2BContainer } from '~/lib/e2b-container';
 
 export interface ArtifactState {
   id: string;
@@ -302,7 +303,28 @@ export class WorkbenchStore {
       unreachable('Artifact not found');
     }
 
-    return artifact.runner.addAction(data);
+    // E2B container integration
+    let containerId: string | null = null;
+    try {
+      const container = await createE2BContainer();
+      containerId = container.id;
+      await startE2BContainer(containerId);
+    } catch (error) {
+      console.error('Failed to create or start E2B container:', error);
+    }
+
+    try {
+      return artifact.runner.addAction(data);
+    } finally {
+      // Stop the E2B container after adding the action
+      if (containerId) {
+        try {
+          await stopE2BContainer(containerId);
+        } catch (error) {
+          console.error('Failed to stop E2B container:', error);
+        }
+      }
+    }
   }
 
   runAction(data: ActionCallbackData, isStreaming: boolean = false) {
@@ -327,32 +349,53 @@ export class WorkbenchStore {
       return;
     }
 
-    if (data.action.type === 'file') {
-      const wc = await webcontainer;
-      const fullPath = nodePath.join(wc.workdir, data.action.filePath);
+    // E2B container integration
+    let containerId: string | null = null;
+    try {
+      const container = await createE2BContainer();
+      containerId = container.id;
+      await startE2BContainer(containerId);
+    } catch (error) {
+      console.error('Failed to create or start E2B container:', error);
+    }
 
-      if (this.selectedFile.value !== fullPath) {
-        this.setSelectedFile(fullPath);
-      }
+    try {
+      if (data.action.type === 'file') {
+        const wc = await webcontainer;
+        const fullPath = nodePath.join(wc.workdir, data.action.filePath);
 
-      if (this.currentView.value !== 'code') {
-        this.currentView.set('code');
-      }
+        if (this.selectedFile.value !== fullPath) {
+          this.setSelectedFile(fullPath);
+        }
 
-      const doc = this.#editorStore.documents.get()[fullPath];
+        if (this.currentView.value !== 'code') {
+          this.currentView.set('code');
+        }
 
-      if (!doc) {
-        await artifact.runner.runAction(data, isStreaming);
-      }
+        const doc = this.#editorStore.documents.get()[fullPath];
 
-      this.#editorStore.updateFile(fullPath, data.action.content);
+        if (!doc) {
+          await artifact.runner.runAction(data, isStreaming);
+        }
 
-      if (!isStreaming) {
+        this.#editorStore.updateFile(fullPath, data.action.content);
+
+        if (!isStreaming) {
+          await artifact.runner.runAction(data);
+          this.resetAllFileModifications();
+        }
+      } else {
         await artifact.runner.runAction(data);
-        this.resetAllFileModifications();
       }
-    } else {
-      await artifact.runner.runAction(data);
+    } finally {
+      // Stop the E2B container after running the action
+      if (containerId) {
+        try {
+          await stopE2BContainer(containerId);
+        } catch (error) {
+          console.error('Failed to stop E2B container:', error);
+        }
+      }
     }
   }
 

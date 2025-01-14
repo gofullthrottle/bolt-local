@@ -16,6 +16,7 @@ import { PromptLibrary } from '~/lib/common/prompt-library';
 import { allowedHTMLElements } from '~/utils/markdown';
 import { LLMManager } from '~/lib/modules/llm/manager';
 import { createScopedLogger } from '~/utils/logger';
+import { createE2BContainer, startE2BContainer, stopE2BContainer } from '~/lib/e2b-container';
 
 interface ToolResult<Name extends string, Args, Result> {
   toolCallId: string;
@@ -226,7 +227,17 @@ export async function streamText(props: {
 
   logger.info(`Sending llm call to ${provider.name} with model ${modelDetails.name}`);
 
-  return await _streamText({
+  // E2B container integration
+  let containerId: string | null = null;
+  try {
+    const container = await createE2BContainer();
+    containerId = container.id;
+    await startE2BContainer(containerId);
+  } catch (error) {
+    logger.error('Failed to create or start E2B container:', error);
+  }
+
+  const result = await _streamText({
     model: provider.getModelInstance({
       model: currentModel,
       serverEnv,
@@ -238,4 +249,15 @@ export async function streamText(props: {
     messages: convertToCoreMessages(processedMessages as any),
     ...options,
   });
+
+  // Stop the E2B container after streaming
+  if (containerId) {
+    try {
+      await stopE2BContainer(containerId);
+    } catch (error) {
+      logger.error('Failed to stop E2B container:', error);
+    }
+  }
+
+  return result;
 }

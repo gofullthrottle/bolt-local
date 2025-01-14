@@ -24,7 +24,10 @@
     "typecheck": "tsc",
     "typegen": "wrangler types",
     "preview": "pnpm run build && pnpm run start",
-    "prepare": "husky"
+    "prepare": "husky",
+    "e2b:create": "curl -X POST https://api.e2b.com/containers",
+    "e2b:start": "curl -X POST https://api.e2b.com/containers/$CONTAINER_ID/start",
+    "e2b:stop": "curl -X POST https://api.e2b.com/containers/$CONTAINER_ID/stop"
   },
   "engines": {
     "node": ">=18.18.0"

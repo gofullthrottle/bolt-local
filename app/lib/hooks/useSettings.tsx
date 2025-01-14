@@ -9,6 +9,7 @@ import {
   latestBranchStore,
   autoSelectStarterTemplate,
   enableContextOptimizationStore,
+  e2bContainerSettingsStore,
 } from '~/lib/stores/settings';
 import { useCallback, useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
@@ -35,6 +36,7 @@ export function useSettings() {
   const autoSelectTemplate = useStore(autoSelectStarterTemplate);
   const [activeProviders, setActiveProviders] = useState<ProviderInfo[]>([]);
   const contextOptimizationEnabled = useStore(enableContextOptimizationStore);
+  const e2bContainerSettings = useStore(e2bContainerSettingsStore);
 
   // Function to check if we're on stable version
   const checkIsStableVersion = async () => {
@@ -134,6 +136,18 @@ export function useSettings() {
     if (savedContextOptimizationEnabled) {
       enableContextOptimizationStore.set(savedContextOptimizationEnabled === 'true');
     }
+
+    // Load E2B container settings from cookies
+    const savedE2BContainerSettings = Cookies.get('e2bContainerSettings');
+
+    if (savedE2BContainerSettings) {
+      try {
+        const parsedE2BContainerSettings = JSON.parse(savedE2BContainerSettings);
+        e2bContainerSettingsStore.set(parsedE2BContainerSettings);
+      } catch (error) {
+        console.error('Failed to parse E2B container settings from cookies:', error);
+      }
+    }
   }, []);
 
   // writing values to cookies on change
@@ -157,6 +171,11 @@ export function useSettings() {
 
     setActiveProviders(active);
   }, [providers, isLocalModel]);
+
+  // Save E2B container settings to cookies on change
+  useEffect(() => {
+    Cookies.set('e2bContainerSettings', JSON.stringify(e2bContainerSettings));
+  }, [e2bContainerSettings]);
 
   // helper function to update settings
   const updateProviderSettings = useCallback(
@@ -207,6 +226,11 @@ export function useSettings() {
     Cookies.set('contextOptimizationEnabled', String(enabled));
   }, []);
 
+  const updateE2BContainerSettings = useCallback((settings: any) => {
+    e2bContainerSettingsStore.set(settings);
+    logStore.logSystem('E2B container settings updated');
+  }, []);
+
   return {
     providers,
     activeProviders,
@@ -225,5 +249,7 @@ export function useSettings() {
     setAutoSelectTemplate,
     contextOptimizationEnabled,
     enableContextOptimization,
+    e2bContainerSettings,
+    updateE2BContainerSettings,
   };
 }

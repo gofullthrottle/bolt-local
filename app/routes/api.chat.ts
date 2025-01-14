@@ -6,6 +6,7 @@ import { streamText, type Messages, type StreamingOptions } from '~/lib/.server/
 import SwitchableStream from '~/lib/.server/llm/switchable-stream';
 import type { IProviderSetting } from '~/types/model';
 import { createScopedLogger } from '~/utils/logger';
+import { createE2BContainer, startE2BContainer, stopE2BContainer } from '~/lib/e2b-container';
 
 export async function action(args: ActionFunctionArgs) {
   return chatAction(args);
